@@ -1,4 +1,5 @@
 const Complaint = require("../models/Complaint");
+const Notification = require("../models/Notification");
 
 const createComplaint = async (req, res) => {
 
@@ -191,6 +192,18 @@ const verifyComplaint = async (req, res) => {
 
         await complaint.save();
 
+        await Notification.create({
+
+            recipient: complaint.user,
+
+            message: `Your ${complaint.category} complaint has been verified by the NGO.`,
+
+            type: "Complaint Verified",
+
+            complaint: complaint._id
+
+        });
+
         res.json({
 
             success: true,
@@ -222,6 +235,18 @@ const approveComplaint = async(req,res)=>{
         complaint.status = "Approved";
 
         await complaint.save();
+
+        await Notification.create({
+
+            recipient: complaint.user,
+
+            message: `Your ${complaint.category} complaint has been approved by the government.`,
+
+            type: "Complaint Approved",
+
+            complaint: complaint._id
+
+        });
 
         res.json({
 
@@ -261,6 +286,34 @@ const assignWorker = async(req,res)=>{
 
         await complaint.save();
 
+
+        // Notify Worker
+        await Notification.create({
+
+            recipient: workerId,
+
+            message: `You have been assigned a new ${complaint.category} complaint.`,
+
+            type: "Worker Assigned",
+
+            complaint: complaint._id
+
+        });
+
+
+        // Notify Citizen
+        await Notification.create({
+
+            recipient: complaint.user,
+
+            message: `A worker has been assigned to your ${complaint.category} complaint.`,
+
+            type: "Worker Assigned",
+
+            complaint: complaint._id
+
+        });
+
         res.json({
 
             message:"Worker Assigned"
@@ -296,6 +349,18 @@ const updateComplaintStatus = async(req,res)=>{
         complaint.status = status;
 
         await complaint.save();
+
+        await Notification.create({
+
+            recipient: complaint.user,
+
+            message: `Your ${complaint.category} complaint status has been updated to ${status}.`,
+
+            type: "Status Updated",
+
+            complaint: complaint._id
+
+        });
 
         res.json({
 
