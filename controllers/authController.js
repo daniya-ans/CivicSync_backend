@@ -9,6 +9,13 @@ const registerUser = async (req, res) => {
         // Get data from frontend and store it in these variables
         const { name, email, password, phone, role } = req.body;
 
+        // Validate phone number
+        if (!/^[6-9]\d{9}$/.test(phone)) {
+            return res.status(400).json({
+                message: "Please enter a valid 10-digit phone number."
+            });
+        }
+
         const existingUser = await User.findOne({ email });
 
         if (existingUser) {
