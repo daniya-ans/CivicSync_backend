@@ -226,11 +226,35 @@ const verifyComplaint = async (req, res) => {
 
 };
 
-const approveComplaint = async(req,res)=>{
+const approveComplaint = async (req, res) => {
 
-    try{
+    try {
 
         const complaint = await Complaint.findById(req.params.id);
+
+        if (!complaint) {
+
+            return res.status(404).json({
+                message: "Complaint not found"
+            });
+
+        }
+
+        if (complaint.status !== "Verified") {
+
+            return res.status(400).json({
+                message: "Only verified complaints can be approved."
+            });
+
+        }
+
+        if (!complaint.assignedWorker) {
+
+            return res.status(400).json({
+                message: "Please assign a worker before approving the complaint."
+            });
+
+        }
 
         complaint.status = "Approved";
 
@@ -250,17 +274,19 @@ const approveComplaint = async(req,res)=>{
 
         res.json({
 
-            message:"Complaint Approved"
+            message: "Complaint Approved"
 
         });
 
     }
 
-    catch(error){
+    catch (error) {
+
+        console.error(error);
 
         res.status(500).json({
 
-            message:"Server Error"
+            message: "Server Error"
 
         });
 
@@ -268,21 +294,39 @@ const approveComplaint = async(req,res)=>{
 
 };
 
-const assignWorker = async(req,res)=>{
+const assignWorker = async (req, res) => {
 
-    try{
+    try {
 
-        const {
+        const { workerId } = req.body;
 
-            workerId
+        if (!workerId) {
 
-        } = req.body;
+            return res.status(400).json({
+                message: "Worker selection is required."
+            });
+
+        }
 
         const complaint = await Complaint.findById(req.params.id);
 
-        complaint.assignedWorker = workerId;
+        if (!complaint) {
 
-        complaint.status = "Assigned";
+            return res.status(404).json({
+                message: "Complaint not found"
+            });
+
+        }
+
+        if (complaint.status !== "Verified") {
+
+            return res.status(400).json({
+                message: "Worker can only be assigned to a verified complaint."
+            });
+
+        }
+
+        complaint.assignedWorker = workerId;
 
         await complaint.save();
 
@@ -301,32 +345,21 @@ const assignWorker = async(req,res)=>{
         });
 
 
-        // Notify Citizen
-        await Notification.create({
-
-            recipient: complaint.user,
-
-            message: `A worker has been assigned to your ${complaint.category} complaint.`,
-
-            type: "Worker Assigned",
-
-            complaint: complaint._id
-
-        });
-
         res.json({
 
-            message:"Worker Assigned"
+            message: "Worker Assigned"
 
         });
 
     }
 
-    catch(error){
+    catch (error) {
+
+        console.error(error);
 
         res.status(500).json({
 
-            message:"Server Error"
+            message: "Server Error"
 
         });
 
@@ -334,17 +367,70 @@ const assignWorker = async(req,res)=>{
 
 };
 
-const updateComplaintStatus = async(req,res)=>{
+const updateComplaintStatus = async (req, res) => {
 
-    try{
+    try {
 
-        const {
-
-            status
-
-        } = req.body;
+        const { status } = req.body;
 
         const complaint = await Complaint.findById(req.params.id);
+
+        if (!complaint) {
+
+            return res.status(404).json({
+                message: "Complaint not found"
+            });
+
+        }
+
+        // Worker can update only their own assigned complaint
+        if (
+            req.user.role === "worker" &&
+            String(complaint.assignedWorker) !== String(req.user.id)
+        ) {
+
+            return res.status(403).json({
+                message: "You are not assigned to this complaint."
+            });
+
+        }
+
+        // Approved/Assigned → In Progress
+        if (
+            status === "In Progress" &&
+            complaint.status !== "Approved" &&
+            complaint.status !== "Assigned"
+        ) {
+
+            return res.status(400).json({
+                message: "Complaint must be approved or assigned before starting work."
+            });
+
+        }
+
+        // In Progress → Resolved
+        if (
+            status === "Resolved" &&
+            complaint.status !== "In Progress"
+        ) {
+
+            return res.status(400).json({
+                message: "Complaint must be in progress before it can be resolved."
+            });
+
+        }
+
+        // Only allow these worker status updates
+        if (
+            status !== "In Progress" &&
+            status !== "Resolved"
+        ) {
+
+            return res.status(400).json({
+                message: "Invalid status update."
+            });
+
+        }
 
         complaint.status = status;
 
@@ -364,17 +450,19 @@ const updateComplaintStatus = async(req,res)=>{
 
         res.json({
 
-            message:"Complaint Updated"
+            message: "Complaint Updated"
 
         });
 
     }
 
-    catch(error){
+    catch (error) {
+
+        console.error(error);
 
         res.status(500).json({
 
-            message:"Server Error"
+            message: "Server Error"
 
         });
 
